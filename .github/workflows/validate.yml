@@ -1,0 +1,44 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-app:
+    name: App config lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: frenck/action-addon-linter@v2
+        with:
+          path: "./alcedo_nvr"
+
+  tests:
+    name: Ruff & pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: pip install ruff pytest -r alcedo_nvr/requirements.txt
+      - run: ruff check .
+      - run: pytest -q
+
+  build:
+    name: Test build (amd64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build image
+        run: |
+          docker build \
+            --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.13-alpine3.21 \
+            -t alcedo-test alcedo_nvr
+          docker run --rm --entrypoint python3 alcedo-test -c "import alcedo.__main__, numpy, asyncssh; print('ok')"
+          docker run --rm --entrypoint ffmpeg alcedo-test -hide_banner -version | head -1

@@ -1,0 +1,81 @@
+configuration:
+  cameras:
+    name: Kameras
+    description: >-
+      Liste der Kameras. Felder: name, type (reolink/instar/generic), host, username, password,
+      optional: channel (Reolink-NVR), use_https, rtsp_main, rtsp_sub, snapshot_url,
+      record (events/continuous/off), detect (camera/motion/both/off),
+      objects (person, vehicle, animal, motion), motion_sensitivity (1-100), enabled.
+  storage_path:
+    name: Speicherordner
+    description: Aufnahmen und Ereignisse. /media/... verwenden, damit Home Assistant die Clips lesen kann.
+  retention_days:
+    name: Aufbewahrung (Tage)
+    description: Ältere Ereignisse und Daueraufnahmen werden gelöscht.
+  max_storage_percent:
+    name: Max. Plattenbelegung (%)
+    description: Darüber werden zuerst die ältesten Aufnahmen, dann die ältesten Ereignisse gelöscht.
+  pre_seconds:
+    name: Vorlauf (s)
+    description: Sekunden vor dem Alarm, die im Clip enthalten sind.
+  post_seconds:
+    name: Nachlauf (s)
+    description: Das Ereignis endet nach so vielen Sekunden ohne neuen Auslöser.
+  segment_seconds:
+    name: Segmentlänge (s)
+    description: Länge der Aufnahme-Segmente.
+  llm_enabled:
+    name: Lokale KI-Bewertung
+    description: Ein lokales Vision-Sprachmodell prüft jeden Alarm anhand der Bilder.
+  llm_provider:
+    name: KI-Server-Typ
+    description: ollama (Ollama-API) oder openai (OpenAI-kompatibler lokaler Server, z. B. llama.cpp, LocalAI).
+  llm_url:
+    name: KI-Server-URL
+    description: z. B. http://172.30.32.1:11434 für eine Ollama-App auf demselben Rechner.
+  llm_model:
+    name: Vision-Modell
+    description: Ein kleines Modell mit Bildeingabe, z. B. qwen2.5vl:3b, gemma3:4b oder moondream.
+  llm_language:
+    name: Antwortsprache
+  llm_prompt:
+    name: Alarmregeln
+    description: Regeln in Alltagssprache, z. B. "Nur Personen nachts, Nachbars Katze ignorieren".
+  llm_frames:
+    name: Bilder pro Alarm
+    description: Mehr Bilder = bessere Einschätzung, aber langsamer.
+  llm_min_confidence:
+    name: Mindest-Sicherheit
+    description: Darunter wird ein Alarm als "kein Alarm" eingestuft.
+  llm_timeout:
+    name: KI-Zeitlimit (s)
+    description: Antwortet das Modell nicht rechtzeitig, gilt der Alarm als bestätigt (sicherer Ausfallmodus).
+  export_only_confirmed:
+    name: Nur bestätigte Alarme exportieren
+  export_local:
+    name: In lokalen Ordner exportieren
+    description: Clip + Snapshot in den Export-Ordner kopieren (z. B. als Sync-Ordner für pCloud Sync).
+  export_local_path:
+    name: Export-Ordner
+  export_remote:
+    name: Export per SFTP / FTPS / FTP
+  remote_protocol:
+    name: Protokoll
+    description: sftp (empfohlen), ftps (verschlüsselt) oder ftp (unverschlüsselt, nur im lokalen Netz).
+  remote_host:
+    name: Server
+  remote_port:
+    name: Port
+  remote_username:
+    name: Benutzername
+  remote_password:
+    name: Passwort
+  remote_path:
+    name: Zielordner
+  remote_host_key:
+    name: SFTP-Hostschlüssel (optional)
+    description: >-
+      Server-Schlüssel festlegen, z. B. "ssh-ed25519 AAAA...". Leer = der Schlüssel der ersten
+      Verbindung wird gespeichert und danach geprüft (Trust on first use).
+  log_level:
+    name: Log-Level

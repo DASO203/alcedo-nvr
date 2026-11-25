@@ -1,0 +1,101 @@
+name: Alcedo NVR
+version: "0.1.0"
+slug: alcedo_nvr
+description: Lean local NVR for Reolink, Instar & RTSP cameras with local AI (vision LLM) alarm review
+url: https://github.com/DASO203/alcedo-nvr
+arch:
+  - amd64
+  - aarch64
+init: false
+startup: application
+boot: auto
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:cctv
+panel_title: Alcedo NVR
+hassio_api: true
+discovery:
+  - alcedo_nvr
+video: true
+map:
+  - media:rw
+  - share:rw
+ports:
+  8765/tcp: 8765
+ports_description:
+  8765/tcp: API and camera alarm hooks (Instar alarm server). Token protected.
+watchdog: tcp://[HOST]:[PORT:8765]
+options:
+  cameras: []
+  storage_path: /media/alcedo
+  retention_days: 7
+  max_storage_percent: 85
+  pre_seconds: 5
+  post_seconds: 10
+  segment_seconds: 10
+  llm_enabled: false
+  llm_provider: ollama
+  llm_url: http://172.30.32.1:11434
+  llm_model: qwen2.5vl:3b
+  llm_language: de
+  llm_prompt: "Alarm only for people or unknown vehicles on the property. Ignore animals, shadows, rain, insects, headlights and trees moving in the wind."
+  llm_frames: 2
+  llm_min_confidence: 0.6
+  llm_timeout: 120
+  export_only_confirmed: true
+  export_local: true
+  export_local_path: /media/alcedo/export
+  export_remote: false
+  remote_protocol: sftp
+  remote_host: ""
+  remote_port: 22
+  remote_username: ""
+  remote_password: ""
+  remote_path: /alcedo
+  remote_host_key: ""
+  log_level: info
+schema:
+  cameras:
+    - name: str
+      type: list(reolink|instar|ring|generic)
+      host: str?
+      port: port?
+      username: str?
+      password: password?
+      channel: int(0,64)?
+      use_https: bool?
+      rtsp_main: str?
+      rtsp_sub: str?
+      snapshot_url: str?
+      record: list(events|continuous|on_demand|off)?
+      detect: list(camera|motion|both|off)?
+      objects: str?
+      motion_sensitivity: int(1,100)?
+      enabled: bool?
+  storage_path: str
+  retention_days: int(1,365)
+  max_storage_percent: int(10,98)
+  pre_seconds: int(0,60)
+  post_seconds: int(2,120)
+  segment_seconds: int(2,60)
+  llm_enabled: bool
+  llm_provider: list(ollama|openai)
+  llm_url: url
+  llm_model: str
+  llm_language: list(de|en)
+  llm_prompt: str
+  llm_frames: int(1,4)
+  llm_min_confidence: float(0,1)
+  llm_timeout: int(10,600)
+  export_only_confirmed: bool
+  export_local: bool
+  export_local_path: str
+  export_remote: bool
+  remote_protocol: list(sftp|ftps|ftp)
+  remote_host: str?
+  remote_port: port
+  remote_username: str?
+  remote_password: password?
+  remote_path: str
+  remote_host_key: str?
+  log_level: list(debug|info|warning|error)

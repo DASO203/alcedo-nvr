@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alcedo NVR</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --fg:#1c2330; --muted:#677185; --accent:#1288e6; --ok:#1f9d55; --warn:#d97706; --bad:#dc2626; --line:#e3e6eb; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#111418; --card:#1b2027; --fg:#e7eaee; --muted:#98a2b3; --line:#2a313b; } }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 system-ui, sans-serif; background:var(--bg); color:var(--fg); }
+  header { display:flex; align-items:center; gap:12px; padding:16px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; }
+  .pill { padding:2px 8px; border-radius:99px; background:var(--card); border:1px solid var(--line); color:var(--muted); font-size:12px; }
+  main { padding:16px; max-width:1200px; margin:auto; }
+  h2 { font-size:15px; margin:20px 0 8px; }
+  .grid { display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .card img { width:100%; aspect-ratio:16/9; object-fit:cover; background:#000; display:block; }
+  .card .body { padding:10px 12px; }
+  .row { display:flex; justify-content:space-between; gap:8px; align-items:center; }
+  .muted { color:var(--muted); font-size:12px; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); }
+  a { color:var(--accent); }
+  details { margin-top:16px; } code { word-break:break-all; }
+  nav { display:flex; gap:4px; } nav button { border:1px solid var(--line); background:var(--card); color:var(--fg); padding:6px 12px; border-radius:8px; cursor:pointer; }
+  nav button.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .tl-head { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+  .tl { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:8px 12px; }
+  .tl-row { display:grid; grid-template-columns:120px 1fr; gap:8px; align-items:center; min-height:34px; }
+  .tl-name { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .tl-track { position:relative; height:26px; background:var(--bg); border-radius:6px; cursor:crosshair; }
+  .tl-rec { position:absolute; top:9px; height:8px; background:#7cc4f5; border-radius:3px; }
+  .tl-ev { position:absolute; top:2px; width:6px; min-width:6px; height:22px; border-radius:3px; cursor:pointer; transform:translateX(-3px); }
+  .tl-ev.c { background:var(--bad); } .tl-ev.r { background:#9aa4b2; } .tl-ev.p { background:var(--warn); }
+  .tl-scale { position:relative; height:16px; margin-left:128px; font-size:11px; color:var(--muted); }
+  .tl-scale span { position:absolute; transform:translateX(-50%); }
+  .tl-now { position:absolute; top:0; bottom:0; width:2px; background:var(--accent); }
+  video { width:100%; max-height:60vh; background:#000; border-radius:10px; margin-top:12px; display:none; }
+  @media (max-width:600px) { .tl-row { grid-template-columns:70px 1fr; } .tl-scale { margin-left:78px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>🐦 Alcedo NVR</h1>
+  <span class="pill" id="ver">…</span>
+  <span class="pill" id="disk">…</span>
+  <span class="pill" id="llm">…</span>
+  <nav><button id="tab-live" class="on">Übersicht</button><button id="tab-tl">Zeitverlauf</button></nav>
+</header>
+<main>
+<section id="view-tl" hidden>
+  <div class="tl-head">
+    <button id="tl-prev">◀</button><input type="date" id="tl-day"><button id="tl-next">▶</button>
+    <span class="muted">Balken = Aufnahme (Klick spielt ab dieser Zeit ab) · <span style="color:var(--bad)">■</span> Alarm · <span style="color:#9aa4b2">■</span> verworfen · <span style="color:var(--warn)">■</span> in Prüfung</span>
+  </div>
+  <div class="tl" id="tl"></div>
+  <div id="tl-info" class="muted" style="margin-top:8px"></div>
+  <video id="player" controls playsinline></video>
+</section>
+<section id="view-live">
+  <h2>Kameras</h2>
+  <div class="grid" id="cams"></div>
+  <h2>Letzte Ereignisse</h2>
+  <div class="grid" id="events"></div>
+  <details>
+    <summary>Verbindung für die Integration (manuelle Einrichtung)</summary>
+    <p class="muted">Normalerweise wird die Integration automatisch gefunden. Für die manuelle Einrichtung:</p>
+    <p>Host: <code id="host"></code> · Port: <code>8765</code><br>API-Key: <code id="key">(klicken zum Anzeigen)</code></p>
+  </details>
+</section>
+</main>
+<script>
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+const t = ts => ts ? new Date(ts * 1000).toLocaleString() : "–";
+async function j(u, o) { const r = await fetch(u, o); if (!r.ok) throw new Error(r.status); return r.json(); }
+
+async function load() {
+  const info = await j("ui/info");
+  document.getElementById("ver").textContent = "v" + info.version;
+  document.getElementById("disk").textContent = `Speicher ${info.storage.used_percent ?? "?"}% / max ${info.storage.max_percent}%`;
+  document.getElementById("llm").textContent = info.llm.enabled ? `KI: ${info.llm.model}${info.llm.last_error ? " ⚠" : ""}` : "KI aus";
+  document.getElementById("cams").innerHTML = info.cameras.map(c => `
+    <div class="card">
+      <img loading="lazy" src="ui/cameras/${encodeURIComponent(c.id)}/snapshot.jpg?${Date.now()}" alt="">
+      <div class="body">
+        <div class="row"><b>${esc(c.name)}</b><span class="${c.online ? "ok" : "bad"}">${c.online ? "online" : "offline"}</span></div>
+        <div class="muted">${esc(c.type)} · Aufnahme: ${esc(c.record)} ${c.recording ? "●" : "○"} · Erkennung: ${esc(c.detect)}</div>
+        <div class="row"><span class="muted">Heute: ${c.today.events} Ereignisse, ${c.today.confirmed} bestätigt</span>
+        <button data-cam="${esc(c.id)}" data-on="${c.detection}">${c.detection ? "Pausieren" : "Aktivieren"}</button></div>
+      </div>
+    </div>`).join("") || '<p class="muted">Noch keine Kamera konfiguriert (Tab „Konfiguration“).</p>';
+  document.querySelectorAll("button[data-cam]").forEach(b => b.onclick = async () => {
+    await j(`ui/cameras/${b.dataset.cam}/detection`, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({enabled: b.dataset.on !== "true"})});
+    load();
+  });
+  const events = await j("ui/events?limit=30");
+  document.getElementById("events").innerHTML = events.map(e => {
+    const v = e.verdict, state = e.confirmed === null ? '<span class="warn">wird geprüft…</span>' : e.confirmed ? '<span class="bad">Alarm</span>' : '<span class="ok">kein Alarm</span>';
+    return `<div class="card">
+      ${e.snapshot_path ? `<img loading="lazy" src="ui/events/${encodeURIComponent(e.id)}/snapshot.jpg" alt="">` : ""}
+      <div class="body">
+        <div class="row"><b>${esc(e.camera)}</b>${state}</div>
+        <div class="muted">${t(e.start)} · ${esc(e.labels.join(", "))}</div>
+        ${v ? `<div>${esc(v.description)} <span class="muted">(${Math.round(v.confidence*100)}%, ${v.seconds}s)</span></div>` : ""}
+        ${e.clip_path ? `<a href="ui/events/${encodeURIComponent(e.id)}/clip.mp4" target="_blank">Clip ansehen</a>` : ""}
+      </div></div>`;
+  }).join("") || '<p class="muted">Noch keine Ereignisse.</p>';
+}
+document.getElementById("key").onclick = async ev => {
+  const k = await j("ui/key"); ev.target.textContent = k.api_key; document.getElementById("host").textContent = k.host;
+};
+const dayInput = document.getElementById("tl-day");
+const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+dayInput.value = iso(new Date());
+const pct = (ts, tl) => ((ts - tl.start) / 86400 * 100).toFixed(3) + "%";
+const hm = ts => new Date(ts * 1000).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+function play(url, text) {
+  const v = document.getElementById("player");
+  v.src = url; v.style.display = "block"; v.play().catch(() => {});
+  document.getElementById("tl-info").textContent = text;
+}
+async function loadTimeline() {
+  const tl = await j("ui/timeline?day=" + dayInput.value);
+  const now = Date.now() / 1000;
+  let html = '<div class="tl-scale">' + [0,3,6,9,12,15,18,21,24].map(h => `<span style="left:${h/24*100}%">${h}:00</span>`).join("") + "</div>";
+  html += tl.cameras.map(c => `<div class="tl-row"><div class="tl-name" title="${esc(c.name)}">${esc(c.name)}</div>
+    <div class="tl-track" data-cam="${esc(c.id)}">
+      ${c.recordings.map(([a, b]) => `<div class="tl-rec" style="left:${pct(a, tl)};width:${((b - a) / 86400 * 100).toFixed(3)}%"></div>`).join("")}
+      ${c.events.map(e => `<div class="tl-ev ${e.confirmed === null ? "p" : e.confirmed ? "c" : "r"}" data-ev="${esc(e.id)}" data-clip="${e.has_clip}"
+          style="left:${pct(e.start, tl)}" title="${hm(e.start)} ${esc(e.labels.join(", "))} ${esc(e.description || "")}"></div>`).join("")}
+      ${now > tl.start && now < tl.end ? `<div class="tl-now" style="left:${pct(now, tl)}"></div>` : ""}
+    </div></div>`).join("") || '<p class="muted">Keine Kameras.</p>';
+  const box = document.getElementById("tl");
+  box.innerHTML = html;
+  box.querySelectorAll(".tl-ev").forEach(el => el.onclick = ev => {
+    ev.stopPropagation();
+    const id = el.dataset.ev;
+    if (el.dataset.clip === "true") play(`ui/events/${encodeURIComponent(id)}/clip.mp4`, el.title);
+    else { document.getElementById("tl-info").innerHTML = `${esc(el.title)} – kein Clip, <a target="_blank" href="ui/events/${encodeURIComponent(id)}/snapshot.jpg">Snapshot</a>`; }
+  });
+  box.querySelectorAll(".tl-track").forEach(track => track.onclick = ev => {
+    const r = track.getBoundingClientRect();
+    const ts = tl.start + (ev.clientX - r.left) / r.width * 86400 - 10;
+    play(`ui/cameras/${encodeURIComponent(track.dataset.cam)}/recording.mp4?start=${Math.floor(ts)}&duration=60`,
+         `${track.parentElement.querySelector(".tl-name").textContent}: Aufnahme ab ${hm(ts)}`);
+  });
+}
+document.getElementById("player").onerror = () => { document.getElementById("tl-info").textContent = "Zu dieser Zeit gibt es keine Aufnahme."; };
+dayInput.onchange = loadTimeline;
+const shift = n => { const d = new Date(dayInput.value); d.setDate(d.getDate() + n); dayInput.value = iso(d); loadTimeline(); };
+document.getElementById("tl-prev").onclick = () => shift(-1);
+document.getElementById("tl-next").onclick = () => shift(1);
+function tab(tl) {
+  document.getElementById("view-tl").hidden = !tl; document.getElementById("view-live").hidden = tl;
+  document.getElementById("tab-tl").classList.toggle("on", tl); document.getElementById("tab-live").classList.toggle("on", !tl);
+  if (tl) loadTimeline();
+}
+document.getElementById("tab-tl").onclick = () => tab(true);
+document.getElementById("tab-live").onclick = () => tab(false);
+load();
+setInterval(() => document.getElementById("view-tl").hidden ? load() : loadTimeline(), 15000);
+</script>
+</body>
+</html>

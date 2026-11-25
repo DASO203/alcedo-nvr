@@ -1,0 +1,81 @@
+configuration:
+  cameras:
+    name: Cameras
+    description: >-
+      List of cameras. Fields: name, type (reolink/instar/generic), host, username, password,
+      optional: channel (Reolink NVR), use_https, rtsp_main, rtsp_sub, snapshot_url,
+      record (events/continuous/off), detect (camera/motion/both/off),
+      objects (person, vehicle, animal, motion), motion_sensitivity (1-100), enabled.
+  storage_path:
+    name: Storage folder
+    description: Recordings and events. Use /media/... so Home Assistant can read clips.
+  retention_days:
+    name: Retention (days)
+    description: Events and continuous recordings older than this are deleted.
+  max_storage_percent:
+    name: Max. disk usage (%)
+    description: Above this the oldest recordings, then the oldest events are deleted.
+  pre_seconds:
+    name: Pre-roll (s)
+    description: Seconds before the alarm included in the clip.
+  post_seconds:
+    name: Post-roll (s)
+    description: The event ends after this many seconds without new trigger.
+  segment_seconds:
+    name: Segment length (s)
+    description: Length of the recording segments.
+  llm_enabled:
+    name: Local AI review
+    description: Let a local vision language model check every alarm on the images.
+  llm_provider:
+    name: AI server type
+    description: ollama (Ollama API) or openai (OpenAI-compatible local server, e.g. llama.cpp, LocalAI).
+  llm_url:
+    name: AI server URL
+    description: e.g. http://172.30.32.1:11434 for an Ollama app on the same host.
+  llm_model:
+    name: Vision model
+    description: A small model with image input, e.g. qwen2.5vl:3b, gemma3:4b or moondream.
+  llm_language:
+    name: Answer language
+  llm_prompt:
+    name: Alarm rules
+    description: Plain language rules, e.g. "Only people at night, ignore the neighbour's cat".
+  llm_frames:
+    name: Frames per alarm
+    description: More frames = better judgement but slower.
+  llm_min_confidence:
+    name: Min. confidence
+    description: Below this an alarm is classified as "no alarm".
+  llm_timeout:
+    name: AI timeout (s)
+    description: If the model does not answer in time the alarm counts as confirmed (fail-safe).
+  export_only_confirmed:
+    name: Export only confirmed alarms
+  export_local:
+    name: Export to local folder
+    description: Copy clip + snapshot to the export folder (e.g. as watch folder for pCloud Sync).
+  export_local_path:
+    name: Export folder
+  export_remote:
+    name: Export via SFTP / FTPS / FTP
+  remote_protocol:
+    name: Protocol
+    description: sftp (recommended), ftps (encrypted) or ftp (unencrypted, local network only).
+  remote_host:
+    name: Server
+  remote_port:
+    name: Port
+  remote_username:
+    name: User name
+  remote_password:
+    name: Password
+  remote_path:
+    name: Remote folder
+  remote_host_key:
+    name: SFTP host key (optional)
+    description: >-
+      Pin the server key, e.g. "ssh-ed25519 AAAA...". Empty = the key of the first
+      connection is stored and checked afterwards (trust on first use).
+  log_level:
+    name: Log level
