@@ -10,4 +10,5 @@ RUN pip3 install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements
 COPY rootfs /
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1
+HEALTHCHECK --interval=60s --timeout=5s --start-period=60s \n  CMD python3 -c "import socket; socket.create_connection(('127.0.0.1', 8765), 3)"
 CMD ["python3", "-m", "alcedo"]

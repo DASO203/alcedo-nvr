@@ -7,10 +7,7 @@ arch:
   - amd64
   - aarch64
 init: false
-startup: application
-boot: auto
 ingress: true
-ingress_port: 8099
 panel_icon: mdi:cctv
 panel_title: Alcedo NVR
 hassio_api: true
@@ -24,7 +21,6 @@ ports:
   8765/tcp: 8765
 ports_description:
   8765/tcp: API and camera alarm hooks (Instar alarm server). Token protected.
-watchdog: tcp://[HOST]:[PORT:8765]
 options:
   cameras: []
   storage_path: /media/alcedo
