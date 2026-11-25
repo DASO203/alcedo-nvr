@@ -42,3 +42,4 @@ jobs:
             -t alcedo-test alcedo_nvr
           docker run --rm --entrypoint python3 alcedo-test -c "import alcedo.__main__, numpy, asyncssh; print('ok')"
           docker run --rm --entrypoint ffmpeg alcedo-test -hide_banner -version | head -1
+          docker inspect --format '{{json .Config.Healthcheck}}' alcedo-test
