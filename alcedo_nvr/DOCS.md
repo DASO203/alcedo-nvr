@@ -75,7 +75,14 @@ Camera web UI → *Alarm → Alarm Server*:
 - Enable *append alarm trigger to query* so Alcedo knows the source (`active=…`).
 
 ### Ring
-Ring has no local RTSP. Use the **ring-mqtt** app, which provides an RTSP stream per camera (see the `stream_source` attribute of its camera *info* sensor). Ring cameras use `record: on_demand` so the stream is only opened during an alarm (battery!). Trigger alarms from Home Assistant:
+Ring has no local RTSP. Use the **ring-mqtt** app, which provides an RTSP stream per camera (`rtsp://<ring-mqtt host>:8554/<device id>_live`, exact value in the *Stream Source* attribute of its camera *info* sensor; add `user:password@` if you set livestream credentials).
+
+Ring behaviour according to the ring-mqtt documentation: continuous streaming is not recommended, a running live stream **interrupts Ring's own motion detection**, and Ring ends live streams after roughly 10 minutes. Alcedo therefore
+- records Ring cameras with `record: on_demand` - the stream is only opened while an event is active,
+- never opens the stream just for a preview image (the last event image is shown; set `snapshot_url` if you have a still image URL),
+- limits events to 5 minutes.
+
+Trigger alarms from Home Assistant:
 
 ```yaml
 triggers:
@@ -103,6 +110,13 @@ llm_prompt: "Alarm only for people or unknown vehicles. Ignore cats, birds, shad
 ```
 
 On an Intel N100 class mini PC expect roughly tens of seconds per review on CPU (estimate – depends on model, frames and RAM). The alarm itself is raised immediately; the AI verdict follows. 16 GB RAM are recommended when an LLM runs next to Home Assistant.
+
+## Timeline & timelapse
+
+- Web UI -> *Timeline*: one row per camera for a day, recording bars and alarm markers, click to play.
+- Dashboard: the integration ships the card `custom:alcedo-timeline-card` (24 h / 3 days / 7 days, click to play, **Timelapse** button).
+- Timelapse: every event of the period becomes a short part - its clip sped up (default 4x, max. 40 s per clip) or its snapshot as a 1.5 s still - captioned *camera / time / AI description*. Parts are cached and rendered at 960x540 with low CPU priority; finished timelapses are kept for 2 days in `storage_path/timelapse`.
+- The action `alcedo_nvr.create_timelapse` (integration) returns the file path, e.g. to upload a weekly timelapse to pCloud.
 
 ## Storage & export
 

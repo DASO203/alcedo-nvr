@@ -42,7 +42,8 @@ flowchart LR
 - 🎥 **Aufnahme 1:1** (`-c copy`), keine CPU-Last durch Neu-Encodieren. Modi: nur Ereignisse (mit Vorlauf), dauerhaft, **bei Bedarf** (Ring/Akku-Kameras) oder aus.
 - 🚨 **Alarmquellen:** Reolink-Kamera-KI (Person/Fahrzeug/Tier) und Bewegung, INSTAR-Alarmserver, eigene schlanke Bewegungserkennung, jeder Home-Assistant-Sensor über `alcedo_nvr.trigger`.
 - 🧠 **Lokale KI-Prüfung:** Du beschreibst in Alltagssprache, was ein Alarm ist. Das Modell bewertet die Bilder und liefert einen kurzen Satz („Eine Person steht am Gartentor“).
-- 🕒 **Zeitverlauf aller Kameras:** Tagesansicht mit Aufnahmebalken und Alarm-Markierungen. Ein Klick spielt ab dieser Stelle ab.
+- 🕒 **Zeitverlauf aller Kameras:** in der App und als **Dashboard-Karte** (24 h / 3 T / 7 T). Ein Klick spielt ab.
+- ⏩ **Zeitraffer** aller Alarme eines Zeitraums, mit Kamera, Uhrzeit und KI-Beschreibung, auch automatisch nach pCloud.
 - 📤 **Export:** lokal (z. B. als Sync-Ordner für pCloud Sync), SFTP (Hostschlüssel-Prüfung), FTPS, FTP.
 - 🧹 **Speicherverwaltung:** Aufbewahrung in Tagen **und** maximale Plattenbelegung.
 - 🔐 **Sicher:** API nur mit Zufallsschlüssel, Oberfläche nur über die Anmeldung von Home Assistant, Passwörter werden aus Logs entfernt, keine Cloud, keine Telemetrie.
@@ -86,7 +87,9 @@ Aufnahmen gehören auf eine große Platte bzw. ein NAS. In Home Assistant: **Ein
 - Parameter `token`: API-Key (steht in der Alcedo-Oberfläche unter „Verbindung für die Integration“)
 - „Alarmauslöser an Anfrage anhängen“ aktivieren
 
-**Ring:** Ring bietet kein lokales RTSP. Die App **ring-mqtt** stellt pro Kamera einen RTSP-Stream bereit (Attribut `stream_source` des *Info*-Sensors). Alcedo nimmt Ring-Kameras nur **bei Bedarf** auf. Das schont Akku und Ring-Kontingent, dafür gibt es keinen Vorlauf. Ausgelöst wird über Home Assistant:
+**Ring:** Ring bietet kein lokales RTSP. Die App **ring-mqtt** stellt pro Kamera einen RTSP-Stream bereit: `rtsp://<ring-mqtt-host>:8554/<geräte-id>_live`, genau abzulesen im Attribut *Stream Source* des *Info*-Sensors.
+
+Laut ring-mqtt-Doku sollte man Ring nicht dauerhaft streamen. Ein laufender Stream **schaltet Rings eigene Bewegungserkennung ab**, und Ring beendet Streams nach etwa 10 Minuten. Alcedo öffnet den Ring-Stream deshalb **nur während eines Ereignisses**: Es nimmt nur dann auf, holt nur dann Bilder für die KI und zeigt sonst das letzte Bild. Es gibt dafür keinen Vorlauf. Ausgelöst wird über Home Assistant:
 
 ```yaml
 triggers:
@@ -115,6 +118,45 @@ Alle Felder und Optionen stehen in der [DOCS.md](alcedo_nvr/DOCS.md). Die ersche
    ```
 
 Auf einem Mini-PC der N100-Klasse dauert eine Prüfung auf der CPU grob einige zehn Sekunden (Schätzung, abhängig von Modell, Bildanzahl und RAM). Der Alarm selbst kommt sofort, das KI-Urteil folgt. Antwortet die KI nicht, gilt der Alarm als **bestätigt** (sicherer Ausfallmodus). Neben Home Assistant und einem LLM sind **16 GB RAM** empfehlenswert.
+
+## Zeitstrahl & Zeitraffer im Dashboard
+
+Die Integration bringt die Karte **`custom:alcedo-timeline-card`** mit. Sie wird automatisch registriert, du musst keine Ressource hinzufügen:
+
+```yaml
+type: custom:alcedo-timeline-card
+title: Kameras
+hours: 24              # Startzeitraum
+periods: [24, 72, 168] # Knöpfe: 24 h / 3 T / 7 T
+show_rejected: true    # von der KI verworfene Ereignisse grau anzeigen
+timelapse_speed: 4
+```
+
+- Eine Zeile pro Kamera: Aufnahmebalken, rote Alarme, graue verworfene, orange in Prüfung
+- Klick auf einen Marker spielt den Clip ab, Klick auf den Balken spielt die Aufnahme ab dieser Zeit ab
+- **Zeitraffer** erstellt ein Video aller Alarme im gewählten Zeitraum. Jeder Clip wird beschleunigt und mit Kamera, Uhrzeit und KI-Beschreibung beschriftet.
+
+Wöchentlicher Zeitraffer nach pCloud:
+
+```yaml
+triggers:
+  - trigger: time
+    at: "06:00:00"
+conditions:
+  - condition: time
+    weekday: mon
+actions:
+  - action: alcedo_nvr.create_timelapse
+    data:
+      hours: 168
+    response_variable: tl
+  - if: "{{ tl.path is not none }}"
+    then:
+      - action: pcloud_sync.upload_file
+        data:
+          path: "{{ tl.path }}"
+          subfolder: alcedo/zeitraffer
+```
 
 ## pCloud
 

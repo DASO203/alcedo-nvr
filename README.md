@@ -24,7 +24,8 @@ It runs as a Home Assistant **app** (formerly add-on) on the same machine – no
 - 🎥 Recording without re-encoding (`-c copy`): events with pre-roll, continuous, **on demand** (Ring / battery cameras) or off
 - 🚨 Alarm sources: Reolink on-camera AI & motion, INSTAR alarm server, lightweight own motion detection, any HA sensor via `alcedo_nvr.trigger`
 - 🧠 Local AI review with your rules in plain language (Ollama or OpenAI-compatible local servers)
-- 🕒 **Timeline of all cameras** – recordings and alarms per day, click to play
+- 🕒 **Timeline of all cameras** – in the app and as **dashboard card** (24 h / 3 d / 7 d), click to play
+- ⏩ **Timelapse** of all alarms in a period with captions (camera, time, AI description)
 - 📤 Export: local folder, SFTP (host key pinning / TOFU), FTPS, FTP
 - 🧹 Retention by days **and** max. disk usage
 - 🔐 Token-protected API, UI only via Home Assistant Ingress, passwords redacted from logs, no cloud, no telemetry

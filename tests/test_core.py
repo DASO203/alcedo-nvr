@@ -167,3 +167,15 @@ def test_ring_defaults_and_on_demand_segments():
     segs = [Segment(t, Path(f"{t}.mp4")) for t in (0, 10, 20, 100, 110)]
     assert recording_ranges(segs, 10, 0, 1000) == [(0, 30), (100, 120)]
     assert recording_ranges(segs, 10, 15, 105) == [(15, 30), (100, 105)]
+
+
+def test_timelapse_helpers():
+    from alcedo.timelapse import caption, job_key
+
+    assert job_key(0, 100, ["b", "a"], True, "clips", 4) == job_key(
+        0, 100, ["a", "b"], True, "clips", 4
+    )
+    assert job_key(0, 100, ["a"], True, "clips", 4) != job_key(0, 100, ["a"], False, "clips", 4)
+    text = caption("Einfahrt", 1795601700, ["person"], None)
+    assert text.startswith("Einfahrt  ·  ") and text.endswith("person")
+    assert len(caption("x", 0, [], "y" * 200)) == 90

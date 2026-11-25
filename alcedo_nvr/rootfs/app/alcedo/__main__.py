@@ -32,6 +32,7 @@ from .media import (
 from .motion import MotionDetector
 from .sources import ReolinkPoller, fetch_snapshot
 from .storage import Retention, disk_percent
+from .timelapse import TimelapseBuilder
 
 _LOGGER = logging.getLogger("alcedo")
 DATA = Path("/data")
@@ -82,26 +83,46 @@ class AlcedoApp:
             self._recorder_status,
         )
         self.retention = Retention(cfg, self.store)
+        self.timelapse = TimelapseBuilder(cfg, self.store)
         self.recording: dict[str, bool] = {}
+        self.last_images: dict[str, bytes] = {}
         self._workers: list[Any] = []
         self.started = time.time()
 
     async def snapshot(self, cam: CameraConfig) -> bytes:
-        return await fetch_snapshot(self.session, cam, grab_frame)
+        """Current image of a camera.
+
+        Ring (via ring-mqtt): opening the live stream interrupts Ring's own
+        motion detection and drains batteries. Without a snapshot_url the
+        stream is therefore only used while an event is active; otherwise the
+        last image is returned.
+        """
+        if cam.type == "ring" and not cam.snapshot_url and self.events.active(cam.id) is None:
+            if cam.id in self.last_images:
+                return self.last_images[cam.id]
+            raise LookupError("Ring: no image until the first event (stream stays closed)")
+        data = await fetch_snapshot(self.session, cam, grab_frame)
+        self.last_images[cam.id] = data
+        return data
 
     def _recorder_status(self, cam_id: str, running: bool) -> None:
         if self.recording.get(cam_id) != running:
             self.recording[cam_id] = running
             self.api.publish({"type": "camera_update", "camera": cam_id, "recording": running})
 
-    async def timeline(self, day: str | None) -> dict[str, Any]:
-        """All cameras for one local day: recording ranges + events."""
-        try:
-            base = datetime.strptime(day, "%Y-%m-%d") if day else datetime.now()
-        except ValueError as err:
-            raise ValueError("day must be YYYY-MM-DD") from err
-        start = base.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
-        end = start + 86400
+    async def timeline(
+        self, day: str | None, start: float | None = None, end: float | None = None
+    ) -> dict[str, Any]:
+        """All cameras for one local day (or a start/end range up to 31 days)."""
+        if start is None or end is None:
+            try:
+                base = datetime.strptime(day, "%Y-%m-%d") if day else datetime.now()
+            except ValueError as err:
+                raise ValueError("day must be YYYY-MM-DD") from err
+            start = base.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+            end = start + 86400
+        if not 0 < end - start <= 31 * 86400:
+            raise ValueError("range must be between 0 and 31 days")
         events = await self.store.between(start, end)
         cams = []
         for cam in self.cfg.cameras:
@@ -255,6 +276,7 @@ class AlcedoApp:
         for worker in self._workers:
             await worker.stop()
         await self.events.stop()
+        await self.timelapse.stop()
         await self.retention.stop()
         await self.api.stop()
         await self.session.close()

@@ -72,6 +72,14 @@ class Retention:
             for seg in expired_segments(segments, keep, now):
                 await asyncio.to_thread(seg.path.unlink, True)
                 self.deleted_segments += 1
+        for folder, max_age in (
+            (storage / "timelapse", 2 * 86400),
+            (storage / "timelapse" / "parts", keep_events),
+        ):
+            if folder.is_dir():
+                for file in await asyncio.to_thread(lambda f=folder: list(f.glob("*.mp4"))):
+                    if now - file.stat().st_mtime > max_age:
+                        await asyncio.to_thread(file.unlink, True)
         tmp = storage / "tmp"  # timeline playback clips
         if tmp.is_dir():
             for clip in await asyncio.to_thread(lambda: list(tmp.glob("*.mp4"))):

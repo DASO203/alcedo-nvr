@@ -8,6 +8,7 @@ import hmac
 import json
 import logging
 from pathlib import Path
+import time
 from typing import TYPE_CHECKING, Any
 
 from aiohttp import WSMsgType, web
@@ -85,6 +86,9 @@ class Api:
         r.add_get(f"{prefix}/cameras/{{camera}}/snapshot.jpg", self.camera_snapshot)
         r.add_post(f"{prefix}/cameras/{{camera}}/detection", self.camera_detection)
         r.add_get(f"{prefix}/timeline", self.timeline)
+        r.add_post(f"{prefix}/timelapse", self.timelapse_start)
+        r.add_get(f"{prefix}/timelapse/{{job}}", self.timelapse_status)
+        r.add_get(f"{prefix}/timelapse/{{job}}/video.mp4", self.timelapse_video)
         r.add_get(f"{prefix}/cameras/{{camera}}/recording.mp4", self.recording)
         if prefix == "/api":
             r.add_get(f"{prefix}/cameras/{{camera}}/stream", self.camera_stream)
@@ -165,10 +169,50 @@ class Api:
         return web.Response(body=data, content_type="image/jpeg")
 
     async def timeline(self, request: web.Request) -> web.Response:
+        q = request.query
         try:
-            return web.json_response(await self.app.timeline(request.query.get("day")))
+            start = float(q["start"]) if "start" in q else None
+            end = float(q["end"]) if "end" in q else None
+            return web.json_response(await self.app.timeline(q.get("day"), start, end))
         except ValueError as err:
             raise web.HTTPBadRequest(text=str(err)) from err
+
+    async def timelapse_start(self, request: web.Request) -> web.Response:
+        """Body: {hours | start+end, cameras?, only_confirmed?, mode?, speed?}."""
+        try:
+            body = await request.json()
+            now = time.time()
+            if "start" in body:
+                start, end = float(body["start"]), float(body.get("end", now))
+            else:
+                hours = max(1.0, min(24 * 31, float(body.get("hours", 24))))
+                # round to 5 minutes so repeated requests hit the cache
+                end = now - now % 300
+                start = end - hours * 3600
+            cameras = body.get("cameras") or None
+            job = await self.app.timelapse.request(
+                start,
+                end,
+                cameras,
+                bool(body.get("only_confirmed", True)),
+                str(body.get("mode", "clips")),
+                int(body.get("speed", 4)),
+            )
+        except (ValueError, TypeError) as err:
+            raise web.HTTPBadRequest(text=str(err)) from err
+        return web.json_response(job)
+
+    async def timelapse_status(self, request: web.Request) -> web.Response:
+        job = self.app.timelapse.jobs.get(request.match_info["job"])
+        if job is None:
+            raise web.HTTPNotFound()
+        return web.json_response(job)
+
+    async def timelapse_video(self, request: web.Request) -> web.StreamResponse:
+        job = self.app.timelapse.jobs.get(request.match_info["job"])
+        if job is None or job["state"] != "done":
+            raise web.HTTPNotFound()
+        return self._file(job["path"], "video/mp4")
 
     async def recording(self, request: web.Request) -> web.StreamResponse:
         cam = self._camera(request)

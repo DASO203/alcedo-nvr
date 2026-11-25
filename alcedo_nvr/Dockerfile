@@ -2,7 +2,7 @@ ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
 # ffmpeg: recording (stream copy), clip assembly, motion frames, image scaling
-RUN apk add --no-cache ffmpeg tzdata
+RUN apk add --no-cache ffmpeg tzdata font-dejavu
 
 COPY requirements.txt /tmp/requirements.txt
 RUN pip3 install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
