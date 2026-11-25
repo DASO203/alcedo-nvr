@@ -7,17 +7,19 @@ import json
 from pathlib import Path
 import re
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 OPTIONS_FILE = Path("/data/options.json")
 _SLUG = re.compile(r"[^a-z0-9_]+")
+_UMLAUTS = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss"})
 
 VALID_OBJECTS = ("person", "vehicle", "animal", "motion")
 
 
 def slugify(name: str) -> str:
     """Return a safe id for a camera name ("Einfahrt Nord" -> "einfahrt_nord")."""
-    slug = _SLUG.sub("_", name.strip().lower()).strip("_")
+    name = name.strip().lower().translate(_UMLAUTS)
+    slug = _SLUG.sub("_", name).strip("_")
     return slug or "camera"
 
 
@@ -46,6 +48,8 @@ class CameraConfig:
     objects: tuple[str, ...] = ("person", "vehicle")
     motion_sensitivity: int = 50
     enabled: bool = True
+    source: str = "config"  # config (app options) | ha (added from Home Assistant)
+    ha_entity: str = ""  # Home Assistant entity / device the camera was taken from
 
     # ------------------------------------------------------------ stream urls
 
@@ -95,9 +99,23 @@ class CameraConfig:
             self.detect == "camera" and self.type == "generic"
         )
 
+    @property
+    def stream_id(self) -> str:
+        """Main stream without credentials, used to recognise a camera ("host:port/path")."""
+        try:
+            parts = urlsplit(self.main_url)
+            host = (parts.hostname or "").lower()
+            port = parts.port or 554
+        except ValueError:
+            return ""
+        return f"{host}:{port}{parts.path}" if host else ""
+
     def public_dict(self) -> dict[str, Any]:
         """Info without credentials (for API / UI / logs)."""
         return {
+            "source": self.source,
+            "ha_entity": self.ha_entity,
+            "stream_id": self.stream_id,
             "id": self.id,
             "name": self.name,
             "type": self.type,
@@ -167,11 +185,17 @@ def _default_detect(cam_type: str) -> str:
     return {"reolink": "camera", "instar": "camera", "ring": "off"}.get(cam_type, "motion")
 
 
-def parse_options(data: dict[str, Any]) -> AppConfig:
-    """Build the typed configuration from the Supervisor options."""
+def parse_options(data: dict[str, Any], managed: list[dict[str, Any]] | None = None) -> AppConfig:
+    """Build the typed configuration from the Supervisor options.
+
+    ``managed`` are the cameras added from Home Assistant (/data/cameras.json).
+    They come after the option cameras, so existing camera ids never change.
+    """
     cameras: list[CameraConfig] = []
     used: set[str] = set()
-    for raw in data.get("cameras", []):
+    raws = [(raw, "config") for raw in data.get("cameras", [])]
+    raws += [(raw, "ha") for raw in managed or []]
+    for raw, source in raws:
         cam_id = slugify(raw["name"])
         base, n = cam_id, 2
         while cam_id in used:
@@ -198,6 +222,8 @@ def parse_options(data: dict[str, Any]) -> AppConfig:
                 objects=parse_objects(raw.get("objects")),
                 motion_sensitivity=int(raw.get("motion_sensitivity") or 50),
                 enabled=bool(raw.get("enabled", True)),
+                source=source,
+                ha_entity=raw.get("ha_entity") or "",
             )
         )
     return AppConfig(
@@ -236,9 +262,11 @@ def parse_options(data: dict[str, Any]) -> AppConfig:
     )
 
 
-def load_options(path: Path = OPTIONS_FILE) -> AppConfig:
-    """Load options from disk."""
-    return parse_options(json.loads(path.read_text(encoding="utf-8")))
+def load_options(
+    path: Path = OPTIONS_FILE, managed: list[dict[str, Any]] | None = None
+) -> AppConfig:
+    """Load options from disk (plus the cameras added from Home Assistant)."""
+    return parse_options(json.loads(path.read_text(encoding="utf-8")), managed)
 
 
 def redact(text: str, cfg: AppConfig) -> str:

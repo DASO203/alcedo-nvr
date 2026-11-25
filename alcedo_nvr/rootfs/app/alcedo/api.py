@@ -90,7 +90,10 @@ class Api:
         r.add_get(f"{prefix}/timelapse/{{job}}", self.timelapse_status)
         r.add_get(f"{prefix}/timelapse/{{job}}/video.mp4", self.timelapse_video)
         r.add_get(f"{prefix}/cameras/{{camera}}/recording.mp4", self.recording)
+        r.add_get(f"{prefix}/cameras", self.cameras_list)
         if prefix == "/api":
+            r.add_post(f"{prefix}/cameras", self.cameras_add)
+            r.add_delete(f"{prefix}/cameras/{{camera}}", self.camera_remove)
             r.add_get(f"{prefix}/cameras/{{camera}}/stream", self.camera_stream)
             r.add_get(f"{prefix}/ws", self.websocket)
 
@@ -230,6 +233,41 @@ class Api:
     async def camera_stream(self, request: web.Request) -> web.Response:
         cam = self._camera(request)
         return web.json_response({"main": cam.main_url, "sub": cam.sub_url})
+
+    async def cameras_list(self, request: web.Request) -> web.Response:
+        return web.json_response([c.public_dict() for c in self.app.cfg.cameras])
+
+    async def cameras_add(self, request: web.Request) -> web.Response:
+        """Body: {"cameras": [{name, type, host, ..., ha_entity}]} (from Home Assistant).
+
+        The cameras are stored in /data/cameras.json and the camera workers are
+        restarted a second after the reply.
+        """
+        try:
+            body = await request.json()
+            raws = body.get("cameras") if isinstance(body, dict) else None
+            if not isinstance(raws, list) or not raws:
+                raise ValueError("cameras: list required")
+            taken = {c.name for c in self.app.cfg.cameras if c.source == "config"}
+            added = await asyncio.to_thread(self.app.managed.add, raws, taken)
+        except ValueError as err:
+            raise web.HTTPBadRequest(text=str(err)) from err
+        names = [c["name"] for c in added]
+        if added:
+            _LOGGER.info("Cameras added from Home Assistant: %s", ", ".join(names))
+            self.app.request_reload()
+        return web.json_response({"added": names, "restarting": bool(added)})
+
+    async def camera_remove(self, request: web.Request) -> web.Response:
+        cam = self._camera(request)
+        if cam.source != "ha":
+            raise web.HTTPConflict(
+                text="This camera is configured in the app options; remove it there."
+            )
+        await asyncio.to_thread(self.app.managed.remove, cam.name)
+        _LOGGER.info("Camera %s removed", cam.name)
+        self.app.request_reload()
+        return web.json_response({"removed": cam.id, "restarting": True})
 
     async def camera_detection(self, request: web.Request) -> web.Response:
         cam = self._camera(request)

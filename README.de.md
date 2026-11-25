@@ -39,6 +39,7 @@ flowchart LR
 
 ## Funktionen
 
+- 📷 **Übernimmt Kameras, die schon in Home Assistant sind** (Reolink-Integration, Generische Kamera/RTSP, ring-mqtt), ohne sie neu einzutragen.
 - 🎥 **Aufnahme 1:1** (`-c copy`), keine CPU-Last durch Neu-Encodieren. Modi: nur Ereignisse (mit Vorlauf), dauerhaft, **bei Bedarf** (Ring/Akku-Kameras) oder aus.
 - 🚨 **Alarmquellen:** Reolink-Kamera-KI (Person/Fahrzeug/Tier) und Bewegung, INSTAR-Alarmserver, eigene schlanke Bewegungserkennung, jeder Home-Assistant-Sensor über `alcedo_nvr.trigger`.
 - 🧠 **Lokale KI-Prüfung:** Du beschreibst in Alltagssprache, was ein Alarm ist. Das Modell bewertet die Bilder und liefert einen kurzen Satz („Eine Person steht am Gartentor“).
@@ -60,6 +61,10 @@ flowchart LR
 Aufnahmen gehören auf eine große Platte bzw. ein NAS. In Home Assistant: **Einstellungen → System → Speicher → Netzwerkspeicher hinzufügen**, Verwendung **Medien**, z. B. Name `nvr` → `storage_path: /media/nvr/alcedo`. Den Ordner aus den Backups ausschließen.
 
 ## Kameras
+
+**Kameras, die schon in Home Assistant sind** (Reolink-Integration, Generische Kamera/RTSP, ring-mqtt …), musst du nicht neu eintragen. Die Integration bietet sie beim Einrichten und später unter *Einstellungen → Geräte & Dienste → Entdeckt* an: „Neue Kamera Einfahrt gefunden, in Alcedo aufnehmen?“ → **Hinzufügen**.
+
+Alternativ trägst du Kameras direkt in der App-Konfiguration ein:
 
 ```yaml
 - name: Einfahrt

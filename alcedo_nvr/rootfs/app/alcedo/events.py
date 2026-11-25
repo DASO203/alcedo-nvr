@@ -76,6 +76,9 @@ class EventStore:
         self._db.commit()
         self._lock = asyncio.Lock()
 
+    def close(self) -> None:
+        self._db.close()
+
     async def save(self, event: Event) -> None:
         async with self._lock:
             await asyncio.to_thread(self._save, event)

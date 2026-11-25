@@ -21,6 +21,7 @@ from .config import AppConfig, CameraConfig, load_options, redact
 from .events import EventManager, EventStore
 from .export import Exporter
 from .llm import LlmReviewer
+from .managed import ManagedCameras
 from .media import (
     Recorder,
     build_clip,
@@ -63,8 +64,10 @@ def load_api_key() -> str:
 
 
 class AlcedoApp:
-    def __init__(self, cfg: AppConfig) -> None:
+    def __init__(self, cfg: AppConfig, managed: ManagedCameras | None = None) -> None:
         self.cfg = cfg
+        self.managed = managed or ManagedCameras()
+        self.reload_requested = asyncio.Event()
         self.cameras: dict[str, CameraConfig] = {c.id: c for c in cfg.cameras}
         self.api_key = load_api_key()
         self.hostname = socket.gethostname()
@@ -104,6 +107,10 @@ class AlcedoApp:
         data = await fetch_snapshot(self.session, cam, grab_frame)
         self.last_images[cam.id] = data
         return data
+
+    def request_reload(self, delay: float = 1.0) -> None:
+        """Restart all camera workers with the new camera list (after the reply was sent)."""
+        asyncio.get_running_loop().call_later(delay, self.reload_requested.set)
 
     def _recorder_status(self, cam_id: str, running: bool) -> None:
         if self.recording.get(cam_id) != running:
@@ -280,25 +287,38 @@ class AlcedoApp:
         await self.retention.stop()
         await self.api.stop()
         await self.session.close()
+        self.store.close()
 
 
 async def main() -> None:
-    cfg = load_options()
+    cfg = load_options(managed=ManagedCameras().load())
     level = getattr(logging, cfg.log_level.upper(), logging.INFO)
     handler = logging.StreamHandler()
     handler.addFilter(RedactingFilter(cfg))
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
     logging.basicConfig(level=level, handlers=[handler])
-    _LOGGER.info("Alcedo NVR %s starting with %d camera(s)", __version__, len(cfg.cameras))
-    app = AlcedoApp(cfg)
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, stop.set)
-    await app.start()
-    await stop.wait()
-    _LOGGER.info("Stopping")
-    await app.stop()
+    managed = ManagedCameras()
+    while True:
+        _LOGGER.info("Alcedo NVR %s starting with %d camera(s)", __version__, len(cfg.cameras))
+        app = AlcedoApp(cfg, managed)
+        await app.start()
+        stopping = asyncio.ensure_future(stop.wait())
+        reloading = asyncio.ensure_future(app.reload_requested.wait())
+        await asyncio.wait({stopping, reloading}, return_when=asyncio.FIRST_COMPLETED)
+        stopping.cancel()
+        reloading.cancel()
+        await app.stop()
+        if stop.is_set():
+            _LOGGER.info("Stopped")
+            return
+        _LOGGER.info("Camera list changed, restarting the cameras")
+        cfg = load_options(managed=managed.load())
+        handler.filters.clear()
+        handler.addFilter(RedactingFilter(cfg))
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 name: Alcedo NVR
-version: "0.2.0"
+version: "0.3.0"
 slug: alcedo_nvr
 description: Lean local NVR for Reolink, Instar & RTSP cameras with local AI (vision LLM) alarm review
 url: https://github.com/DASO203/alcedo-nvr

@@ -59,6 +59,7 @@ def test_parse_options_and_urls():
 def test_slugify_and_objects():
     assert slugify(" Einfahrt Nord! ") == "einfahrt_nord"
     assert slugify("###") == "camera"
+    assert slugify("Haustür Süd") == "haustuer_sued"
     assert parse_objects("") == ("person", "vehicle")
     assert parse_objects("motion,person person") == ("motion", "person")
 

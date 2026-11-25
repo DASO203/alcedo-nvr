@@ -22,6 +22,18 @@ Lean local NVR for **Reolink**, **INSTAR**, **Ring (via RTSP)** and any **RTSP**
 
 The web UI (sidebar → *Alcedo NVR*) shows cameras, events with AI verdicts and a **timeline of all cameras**: recording bars and alarm markers per camera for one day; a click plays the recording from that moment.
 
+## Cameras from Home Assistant (no second setup)
+
+Cameras that already exist in Home Assistant do not have to be entered here again. The **Alcedo NVR integration** finds them and asks once per camera:
+
+- **Reolink integration**: host, login and channel are taken over, so Alcedo uses the camera's own AI.
+- **Generic camera / ONVIF / other RTSP cameras**: the stream URL that Home Assistant uses. INSTAR (`/11`) and ring-mqtt (`:8554/…_live`) are recognised automatically.
+- **ring-mqtt**: the *Stream Source* of the camera info sensor.
+
+Confirm under *Settings → Devices & services → Discovered*, or choose *Alcedo NVR → Configure → Take over cameras from Home Assistant*. Taken-over cameras are stored in `/data/cameras.json` (readable by the app only, part of the app backup) and appear in the log as `source=ha`. When cameras are added or removed, the app restarts its cameras internally for a few seconds. Remove them via *Configure → Remove taken-over cameras*.
+
+You can mix both ways: cameras in the options below **and** cameras taken over from Home Assistant.
+
 ## Camera configuration
 
 ```yaml
@@ -133,5 +145,6 @@ On an Intel N100 class mini PC expect roughly tens of seconds per review on CPU 
 ## Security
 - API (port 8765) only with the random API key (`/data/api_key`); the web UI only through Home Assistant Ingress.
 - Camera and FTP passwords are removed from all log lines.
+- Cameras taken over from Home Assistant are validated (only `rtsp://`/`rtsps://` streams and `http(s)://` snapshot URLs) and stored with file mode 600.
 - Clips are only served from inside `storage_path`.
 - The app talks only to your cameras, your AI server and your export targets. No cloud, no telemetry.

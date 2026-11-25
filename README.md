@@ -21,6 +21,7 @@ It runs as a Home Assistant **app** (formerly add-on) on the same machine – no
 
 ## Highlights
 
+- 📷 **Takes over cameras that already exist in Home Assistant** (Reolink integration, Generic camera / RTSP, ring-mqtt) – no second setup
 - 🎥 Recording without re-encoding (`-c copy`): events with pre-roll, continuous, **on demand** (Ring / battery cameras) or off
 - 🚨 Alarm sources: Reolink on-camera AI & motion, INSTAR alarm server, lightweight own motion detection, any HA sensor via `alcedo_nvr.trigger`
 - 🧠 Local AI review with your rules in plain language (Ollama or OpenAI-compatible local servers)
